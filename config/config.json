@@ -1,0 +1,9 @@
+{
+  "development": {
+    "username": "postgres",
+    "password": "postgres",
+    "database": "myeasyparser",
+    "host": "localhost",
+    "dialect": "postgres"
+  }
+}

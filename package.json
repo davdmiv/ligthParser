@@ -1,0 +1,32 @@
+{
+  "name": "parserapp",
+  "version": "1.0.0",
+  "description": "",
+  "main": "app.js",
+  "scripts": {
+    "start": "node index.js",
+    "test": "mocha",
+    "test-nocfg": "mocha --no-config"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "async": "^3.2.0",
+    "chalk": "^4.1.1",
+    "cheerio": "^1.0.0-rc.10",
+    "cors": "^2.8.5",
+    "dotenv": "^10.0.0",
+    "md5": "^2.3.0",
+    "pg": "^8.6.0",
+    "pg-hstore": "^2.3.4",
+    "puppeteer": "^10.1.0",
+    "puppeteer-extra": "^3.2.3",
+    "puppeteer-extra-plugin-stealth": "^2.7.8",
+    "sequelize": "^6.6.4",
+    "uuid": "^8.3.2"
+  },
+  "devDependencies": {
+    "mocha": "^9.2.2"
+  }
+}
