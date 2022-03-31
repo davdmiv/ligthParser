@@ -4,6 +4,7 @@
     "password": "postgres",
     "database": "myeasyparser",
     "host": "localhost",
-    "dialect": "postgres"
+    "dialect": "postgres",
+    "pool": { "max": 12, "min": 0, "acquire": 30000, "idle": 10000 }
   }
 }
