@@ -78,12 +78,12 @@ const checkDynamicRule = async (rule) => {
       `По правилу ${rule.name} найдено элементов: ${$(rule.shrub_rule).length}`
     ) // Отладка (!)
 
-    // проверяем есть один ли у нас элемент по присланному "правилу"
+    // Проверяем есть один ли у нас 1 элемент по присланному "правилу"
     if ($(rule.shrub_rule).length === 1) {
       // Фиксируем время застраченное на запрос и поиск элемента
       timeFinish = new Date()
 
-      // если один то инициализируем куст, получаем его кеш как md5
+      // Инициализируем куст, получаем его кеш как md5
       const shrub = $(rule.shrub_rule).html()
       const shrubCalcCache = md5(shrub)
 
@@ -162,6 +162,7 @@ const checkDynamicRule = async (rule) => {
     await Promise.all(pages.map((page) => page.close()))
     await browser.close()
 
+    // Не забываем возвращать правило обратно
     return rule
   } catch (error) {
     console.log(`Правило ${rule.name}. catch (error):`, error)

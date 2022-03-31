@@ -29,13 +29,19 @@ const masterMessageHandler = async (worker, msg) => {
   }
 
   // Пришёл ответ от проверки
-  if (msg.target === 'checkDynamicRule') {
-    let { testedRule } = msg
-    if (!(testedRule instanceof ApiError)) {
+  if (msg.target === 'checkDynamicRule' || msg.target === 'checkStaticRule') {
+    // Если не была передана ошибка
+    if (!msg.error) {
       // Запихиваем его обратно в Парсер, в очередь активных
-      parser.dynamicQueue.push(testedRule)
+      parser.activeRules.push(msg.testedRule)
+    } else {
+      // Просто выводим лог
+      console.log(
+        `${whoIs()}: Правило ${
+          msg.origRule ? msg.origRule.name : 'имя которого неизветно'
+        } обработано c ошибкой`
+      )
     }
-    console.log(`${whoIs()}: Правило ${testedRule.name} обработано`)
     // Записали сами себя в готовые, надеюсь не рано (!)
     parser.freeWorkers.push(worker.id)
   }

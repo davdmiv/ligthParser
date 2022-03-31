@@ -1,7 +1,7 @@
 const { Rule } = require('../models/index')
-const { DynamicQueue } = require('./parser/classes/DynamicQueue')
+const { ParseQueue } = require('./parser/classes/ParseQueue')
 // const ApiError = require('./error/ApiError')
-const { whoIs } = require('./parser/async_handlers/asyncClusterUtils')
+// const { whoIs } = require('./parser/async_handlers/asyncClusterUtils')
 
 /**
  * Singleton
@@ -13,21 +13,17 @@ class ParserController {
   instance = null
   // Текущие активные правила
   activeRules = []
-  staticQueue = []
-  dynamicQueue = []
+  // Контроллер очереди, ссылка на Singleton инстанс
+  parseQueue = null
+  // Свободные воркеры ids
   freeWorkers = []
 
   constructor() {
+    // Singleton
     if (ParserController.instance instanceof ParserController) {
-      console.log(
-        `${whoIs()}: ParserController.constructor: возвращён экземпляр объекта!`
-      ) // (!) Отладка
       return ParserController.instance
     }
 
-    console.log(
-      `${whoIs()}: ParserController.constructor: Singleton ParserController создан!`
-    ) // (!) Отладка
     this.instance = this
     ParserController.instance = this
     return ParserController.instance
@@ -58,36 +54,37 @@ class ParserController {
   async initialQueue() {
     // console.log('ParserController.initialQueue(): this', this)
     let self = this
-    this.instanceDynamicQueue = new DynamicQueue(self)
-
-    // Если инстанс DynamicQueue и DynamicQueue работает
-    // if (this.instanceDynamicQueue.isWork) {
-    //   // пока фиктивный вызов (не реализован)
-    //   this.instanceDynamicQueue.stop()
-    // }
 
     try {
+      // new ParseQueue() может кидать ошибки
+      this.parseQueue = new ParseQueue(self)
+
+      // Если инстанс ParseQueue и ParseQueue работает
+      // if (this.instanceParseQueue.isWork) {
+      //   // пока фиктивный вызов (не реализован)
+      //   this.instanceParseQueue.stop()
+      // }
+
       this.activeRules = await Rule.findAll({
         where: { activate_status: true },
       })
-      this.staticQueue = this.activeRules.filter(
-        (e) => e.page_type === 'static'
-      )
-      this.dynamicQueue = this.activeRules.filter(
-        (e) => e.page_type === 'dynamic'
-      )
+
       console.log('Очереди проинициализированы...')
     } catch (error) {
       console.log(`Ошибка в initialQueue: ${error}`)
     }
   }
 
+  /**
+   * Запуск парсера (через запуск очереди)
+   * @returns
+   */
   start() {
     return new Promise((resolve, reject) => {
       try {
         console.log('Запуск парсера...')
-        this.instanceDynamicQueue.loop()
-        // await this.instanceDynamicQueue.loop()
+        this.parseQueue.loop()
+        // await this.instanceParseQueue.loop()
         console.log('Парсер запущен!')
         resolve(true)
       } catch (error) {
@@ -96,13 +93,22 @@ class ParserController {
     })
   }
 
-  // stop() {
-  //   console.log('Остановка парсера...')
-  //   if (this.instanceDynamicQueue) {
-  //     this.instanceDynamicQueue.stop()
-  //   }
-  //   console.log('Парсер остановлен')
-  // }
+  /**
+   * Остановка парсера (через остановку очереди)
+   * @returns
+   */
+  stop() {
+    return new Promise((resolve, reject) => {
+      try {
+        console.log('Остановка парсера...')
+        this.parseQueue.stop()
+        console.log('Парсер остановлен')
+        resolve(true)
+      } catch (error) {
+        reject(err)
+      }
+    })
+  }
 }
 
 module.exports = { ParserController }
