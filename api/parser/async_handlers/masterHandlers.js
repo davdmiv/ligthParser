@@ -2,7 +2,7 @@
 const cluster = require('cluster')
 
 // ParserController
-const { ParserController } = require('../../ParserController')
+const { ParserController } = require('../classes/ParserController')
 
 const { whoIs } = require('./asyncClusterUtils')
 

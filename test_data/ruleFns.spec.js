@@ -1,5 +1,5 @@
 const { ruleCreate } = require('./ruleFns')
-const { firstCheck } = require('./checkFns')
+const { firstCheck } = require('./check_functions/firstCheck')
 const ApiError = require('../error/ApiError')
 const { dataLocal: testData } = require('../../test_data/data')
 

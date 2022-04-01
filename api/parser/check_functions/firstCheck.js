@@ -1,8 +1,8 @@
-const { ChangeNote } = require('../../models/index')
-const ApiError = require('../error/ApiError')
-const easyRuleDynamicTest = require('./check_functions/firstCheckDynamic')
-const easyRuleStaticTest = require('./check_functions/firstCheckStatic')
-const RuleDTO = require('./dto/Rule.dto')
+const { ChangeNote } = require('../../../models/index')
+const ApiError = require('../../error/ApiError')
+const firstCheckDynamic = require('./firstCheckDynamic')
+const firstCheckStatic = require('./firstCheckStatic')
+const RuleDTO = require('../dto/Rule.dto')
 
 const firstCheck = async (testRuleData) => {
   // Достаём тип страницы (для удобства)
@@ -15,11 +15,11 @@ const firstCheck = async (testRuleData) => {
   try {
     // если страница статческая
     if (pageType === 'static') {
-      testResult = await easyRuleStaticTest(testRuleData)
+      testResult = await firstCheckStatic(testRuleData)
 
       // если страница динамическая
     } else if (pageType === 'dynamic') {
-      testResult = await easyRuleDynamicTest(testRuleData)
+      testResult = await firstCheckDynamic(testRuleData)
 
       // если страница неизвестного типа
     } else {
@@ -57,6 +57,4 @@ const firstCheck = async (testRuleData) => {
   }
 }
 
-module.exports = {
-  firstCheck,
-}
+module.exports = firstCheck

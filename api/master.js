@@ -2,7 +2,7 @@ require('dotenv').config()
 // Кластер
 const cluster = require('cluster')
 // ParserController
-const { ParserController } = require('./ParserController')
+const { ParserController } = require('./parser/classes/ParserController')
 // Библиотека для работы с БД, инстанс
 const { sequelize } = require('../models/index')
 // Оброботчик события message для Master

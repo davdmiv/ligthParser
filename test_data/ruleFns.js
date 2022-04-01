@@ -1,5 +1,5 @@
-const { Rule, ChangeNote } = require('../../models/index')
-const ApiError = require('../error/ApiError')
+const { Rule, ChangeNote } = require('../models/index')
+const ApiError = require('../api/error/ApiError')
 
 const ruleCreate = async (ruleWithChangeNote) => {
   // Достаём уже подготовыленные rule и первый changeNote

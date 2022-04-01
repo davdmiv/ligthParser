@@ -18,7 +18,7 @@ const {
 // const { sequelize } = require('./models/index')
 
 // Импортируем конфигурацию веб-сервера
-const app = require('./app')
+const app = require('./server/app')
 
 // Создаём сервер на основе импортированной конфигурации
 const server = http.createServer(app)

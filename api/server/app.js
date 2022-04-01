@@ -6,9 +6,9 @@ const express = require('express')
 const cors = require('cors')
 
 // Роутер для express, все маршруты описаны там
-const router = require('./server/routes/index')
+const router = require('./routes/index')
 // Middleware для обработки ошибок
-const errorHandler = require('./server/middleware/ErrorHandlingMiddleware')
+const errorHandler = require('./middleware/ErrorHandlingMiddleware')
 
 // Создаём экзампляр сервера
 const app = express()

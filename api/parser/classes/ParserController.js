@@ -1,5 +1,5 @@
-const { Rule } = require('../models/index')
-const { ParseQueue } = require('./parser/classes/ParseQueue')
+const { Rule } = require('../../../models/index')
+const { ParseQueue } = require('./ParseQueue')
 // const ApiError = require('./error/ApiError')
 // const { whoIs } = require('./parser/async_handlers/asyncClusterUtils')
 

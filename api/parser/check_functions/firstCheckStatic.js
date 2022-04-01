@@ -27,7 +27,7 @@ const PATH_TO_STATIC_CHANGE_NOTES = require('../../utils/consts')
  * @param {*} testRule { shrubRule, url }
  * @returns ChangeNote | ApiError
  */
-const easyRuleStaticTest = async (testRule) => {
+const firstCheckStatic = async (testRule) => {
   // Подготавливаем объект ChangeNote для записи в бд
   const { shrubRule, ruleUrl } = testRule
   try {
@@ -88,4 +88,4 @@ const easyRuleStaticTest = async (testRule) => {
   }
 }
 
-module.exports = easyRuleStaticTest
+module.exports = firstCheckStatic

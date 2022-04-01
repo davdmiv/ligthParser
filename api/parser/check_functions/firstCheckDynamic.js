@@ -31,7 +31,7 @@ puppeteer.use(StealthPlugin())
 // Дабы не терять в любом контексте (!!) возможно можно поместить до try
 let browser
 
-const easyRuleDynamicTest = async (testRule) => {
+const firstCheckDynamic = async (testRule) => {
   // Подготавливаем объект ChangeNote для записи в бд
   const { shrubRule, ruleUrl } = testRule
 
@@ -130,4 +130,4 @@ const easyRuleDynamicTest = async (testRule) => {
   }
 }
 
-module.exports = easyRuleDynamicTest
+module.exports = firstCheckDynamic
