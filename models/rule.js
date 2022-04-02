@@ -42,6 +42,16 @@ module.exports = (sequelize, DataTypes) => {
       // если прошло времени больше, чем частота, то пора проверять
       return timeLeft > new Date(this.frequency)
     }
+
+    // Получить следующее время проверки
+    getNextCheckTime() {
+      return this.last_check.getTime() + this.frequency.getTime()
+    }
+
+    // Получить таймаут до следующей проверки
+    getTimeout() {
+      return this.last_check.getTime() + this.frequency.getTime() - Date.now()
+    }
   }
   Rule.init(
     {
