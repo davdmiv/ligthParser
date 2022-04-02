@@ -1,6 +1,8 @@
+const cluster = require('cluster')
 const { Rule } = require('../../../models/index')
 const { whoIs } = require('../async_handlers/asyncClusterUtils')
-const { ParseQueue } = require('./ParseQueue')
+
+
 // const ApiError = require('./error/ApiError')
 
 /**
@@ -13,10 +15,10 @@ class ParserController {
   instance = null
   // Текущие активные правила
   activeRules = []
-  // Контроллер очереди, ссылка на Singleton инстанс
-  parseQueue = null
   // Свободные воркеры ids
   freeWorkers = []
+  // Флаг работы
+  isWork = false
 
   constructor() {
     // Singleton
@@ -52,18 +54,15 @@ class ParserController {
    * Инициализация очереди из активных правил на парсинг
    */
   async initialQueue() {
-    // console.log('ParserController.initialQueue(): this', this)
-    let self = this
 
     try {
-      // Если инстанс ParseQueue и ParseQueue работает
-      if (this.parseQueue && this.parseQueue.isWork) {
+      // Если работает
+      if (this.isWork) {
         // пока фиктивный вызов (не реализован)
-        this.parseQueue.stop()
+        this.stop()
       }
-      
-      // new ParseQueue() может кидать ошибки
-      this.parseQueue = new ParseQueue(self)
+
+  
 
       this.activeRules = await Rule.findAll({
         where: { activate_status: true },
@@ -83,8 +82,7 @@ class ParserController {
     return new Promise((resolve, reject) => {
       try {
         console.log('Запуск парсера...')
-        this.parseQueue.loop()
-        // await this.instanceParseQueue.loop()
+        this.loop()
         console.log('Парсер запущен!')
         resolve(true)
       } catch (error) {
@@ -94,21 +92,94 @@ class ParserController {
   }
 
   /**
+   * Метод бесконечной обработки динамических правил
+   * Отбираем из parser.activeRules в локальную readyRules
+   */
+  async loop() {
+    // Включаем бесконечный цикл
+    this.isWork = true
+    // Бесконечный цикл работы (пока включён)
+
+    const loopTick = async () => {
+      if (this.isWork) {
+        // Если очередь парсера с динамическиими правилами не пуста
+        if (this.activeRules.length) {
+          // готовые правила
+          let readyRules = []
+
+          // Изымаем готовые из parser.activeRules, оставляем остальные
+          this.activeRules = this.activeRules.filter((rule) => {
+            let check = false
+            if (rule.dataValues) {
+              check = rule.needCheck()
+            } else {
+              const rez = Rule.build(rule, { isNewRecord: false })
+              check = rez.needCheck()
+            }
+
+            // Если правилу пока ещё не нужна проверка, то остаётся
+            if (!check) {
+              // Если не готово, то оставляем его в очереди
+              return true
+            } else {
+              // Если готово, то изымаем его в массив на обработку
+              readyRules.push(rule)
+              return false
+            }
+          })
+
+          // Если в массиве готовых правил, есть правила
+          while (readyRules.length) {
+            // Нет смысла дожидаться конца обработки очереди готовых,
+            // если парсер остановлен
+            if (!this.isWork) {
+              console.log(
+                ' while (readyRules.length) : !this.isWork : cработало'
+              )
+              break
+            }
+
+            let rule = readyRules.shift()
+
+            try {
+              // Какой-то лютый тупняк
+              // Ждём свободного воркера в синхронном главном процессе
+              let workerId = false
+
+              console.log(`${whoIs()} loop(): поиск воркеров...`)
+              workerId = await this.getWorker()
+              console.log(`${whoIs()} loop(): воркер найден`, workerId)
+
+              // Закинули правило на обработку Worker'у и забыли
+              if (rule.page_type === 'dynamic') {
+                cluster.workers[workerId].send({
+                  target: 'checkDynamicRule',
+                  rule,
+                })
+              } else {
+                cluster.workers[workerId].send({
+                  target: 'checkStaticRule',
+                  rule,
+                })
+              }
+            } catch (error) {
+              console.log(`Ошибка в loop() :`, error)
+            }
+          } // -- Цикл по готовым правилм
+        } // -- Условие: activeRules не пустая
+        setImmediate(loopTick)
+      } // -- Бесконечный цикл
+    }
+    await loopTick()
+    console.log('loop() завершён...')
+  } // -- loop()
+
+  /**
    * Остановка парсера (через остановку очереди)
    * @returns
    */
   stop() {
-    console.log(`${whoIs()} parser.stop()`)
-    return new Promise((resolve, reject) => {
-      try {
-        console.log('Остановка парсера...')
-        this.parseQueue.stop()
-        console.log('Парсер остановлен')
-        resolve(true)
-      } catch (error) {
-        reject(err)
-      }
-    })
+    this.isWork = false
   }
 
   addActiveRule() {

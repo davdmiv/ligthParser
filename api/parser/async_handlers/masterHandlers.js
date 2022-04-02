@@ -1,12 +1,8 @@
-// Кластер
-const cluster = require('cluster')
-
 // ParserController
 const { ParserController } = require('../classes/ParserController')
 
 const { whoIs } = require('./asyncClusterUtils')
 
-const ApiError = require('../../error/ApiError')
 /**
  * -------------------------------------------------
  * Обработка события 'message' на Master'e
