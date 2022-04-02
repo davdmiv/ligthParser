@@ -1,7 +1,7 @@
 const { Rule } = require('../../../models/index')
+const { whoIs } = require('../async_handlers/asyncClusterUtils')
 const { ParseQueue } = require('./ParseQueue')
 // const ApiError = require('./error/ApiError')
-// const { whoIs } = require('./parser/async_handlers/asyncClusterUtils')
 
 /**
  * Singleton
@@ -56,14 +56,14 @@ class ParserController {
     let self = this
 
     try {
+      // Если инстанс ParseQueue и ParseQueue работает
+      if (this.parseQueue && this.parseQueue.isWork) {
+        // пока фиктивный вызов (не реализован)
+        this.parseQueue.stop()
+      }
+      
       // new ParseQueue() может кидать ошибки
       this.parseQueue = new ParseQueue(self)
-
-      // Если инстанс ParseQueue и ParseQueue работает
-      // if (this.instanceParseQueue.isWork) {
-      //   // пока фиктивный вызов (не реализован)
-      //   this.instanceParseQueue.stop()
-      // }
 
       this.activeRules = await Rule.findAll({
         where: { activate_status: true },
@@ -98,6 +98,7 @@ class ParserController {
    * @returns
    */
   stop() {
+    console.log(`${whoIs()} parser.stop()`)
     return new Promise((resolve, reject) => {
       try {
         console.log('Остановка парсера...')
@@ -108,6 +109,14 @@ class ParserController {
         reject(err)
       }
     })
+  }
+
+  addActiveRule() {
+    console.log(`${whoIs()} parser.addActiveRule()`)
+  }
+
+  excludeRule() {
+    console.log(`${whoIs()} parser.addActiveRule()`)
   }
 }
 

@@ -2,8 +2,10 @@
 const cluster = require('cluster')
 
 // Правило проверки динамических правил
-const checkDynamicRule = require('../check_functions/checkDynamicRule')
-const checkStaticRule = require('../check_functions/checkStaticRule')
+// const checkDynamicRule = require('../check_functions/checkDynamicRule')
+// const checkStaticRule = require('../check_functions/checkStaticRule')
+const checkRule = require('../check_functions/checkRule')
+
 const { whoIs } = require('./asyncClusterUtils')
 const ApiError = require('../../error/ApiError')
 
@@ -37,16 +39,7 @@ const workerMessageHandler = async (msg) => {
       // Достаём правило из сообщения
       let { rule } = msg
 
-      let testedRule = null
-
-      // Динамика
-      if (msg.target === 'checkDynamicRule') {
-        testedRule = await checkDynamicRule(rule)
-      }
-      // Статика
-      else if (msg.target === 'checkStaticRule') {
-        testedRule = await checkStaticRule(rule)
-      }
+      let testedRule = await checkRule(rule)
 
       // Если получаем ошибку по правилу -- правило "выбывает из игры"
       // Если пришла обработанная ошибка

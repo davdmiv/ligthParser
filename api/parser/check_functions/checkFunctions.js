@@ -1,4 +1,5 @@
 const firstCheck = require('./firstCheck')
+const checkRule = require('./checkRule')
 const firstCheckDynamic = require('./firstCheckDynamic')
 const firstCheckStatic = require('./firstCheckStatic')
 const checkDynamicRule = require('./checkDynamicRule')
@@ -8,6 +9,7 @@ module.exports = {
   firstCheck,
   firstCheckDynamic,
   firstCheckStatic,
+  checkRule,
   checkDynamicRule,
   checkStaticRule,
 }
