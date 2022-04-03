@@ -27,9 +27,8 @@ const {
     // // Обработка события 'message' на master
     cluster.on('message', masterMessageHandler)
 
-    await parser.initialQueue()
     // Стартуем парсер
-    parser.start()
+    await parser.start()
   } catch (e) {
     console.log(e)
   }

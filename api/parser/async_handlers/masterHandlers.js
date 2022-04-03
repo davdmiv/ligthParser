@@ -1,6 +1,6 @@
 // ParserController
 const { ParserController } = require('../classes/ParserController')
-
+const { Rule } = require('../../../models/index')
 const { whoIs } = require('./asyncClusterUtils')
 
 /**
@@ -15,21 +15,20 @@ const masterMessageHandler = async (worker, msg) => {
     worker.id
   )
   const parser = new ParserController()
-  
+
   // --------------------------------------------------------------
-  // Воркер сообщил о готовности 
+  // Воркер сообщил о готовности
   if (msg.target === 'workerIsReady') {
-    // Записываем ids Worker'ов в инстанс парсера
-    parser.freeWorkers.push(worker.id)
+    // Записали воркер в массив "свободных"
+    parser.pushToFreeWorkers(worker.id)
 
     console.log(`${whoIs()}: parser.freeWorkers:`, parser.freeWorkers.length)
   }
 
   // --------------------------------------------------------------
-  // Запуск парсера 
+  // Запуск парсера
   if (msg.target === 'parserStart') {
-    await parser.initialQueue()
-    parser.start()
+    await parser.start()
   }
 
   // --------------------------------------------------------------
@@ -42,7 +41,10 @@ const masterMessageHandler = async (worker, msg) => {
   // Добавляем правило в очередь активных
   if (msg.target === 'activateRule') {
     if (msg.rule) {
-      parser.addActiveRule(msg.rule)
+      // Ребилдим правило
+      msg.rule = Rule.build(msg.rule, { isNewRecord: false })
+      // Добавляем в очередь
+      await parser.addActiveRule(msg.rule)
     } else {
       console.log(`${whoIs()}: activateRule: правило не опеределено`)
     }
@@ -52,7 +54,7 @@ const masterMessageHandler = async (worker, msg) => {
   // Исключаем правило из очереди активных (если оно там есть)
   if (msg.target === 'deactivateRule') {
     if (msg.ruleId) {
-      parser.excludeRule(msg.ruleId)
+      await parser.excludeRule(msg.ruleId)
     } else {
       console.log(`${whoIs()}: activateRule: правило не опеределено`)
     }
@@ -60,11 +62,13 @@ const masterMessageHandler = async (worker, msg) => {
 
   // --------------------------------------------------------------
   // Пришёл ответ от проверки
-  if (msg.target === 'checkDynamicRule' || msg.target === 'checkStaticRule') {
+  if (msg.target === 'checkRule') {
     // Если не была передана ошибка
     if (!msg.error) {
+      // Ребилдим правило
+      msg.testedRule = Rule.build(msg.testedRule, { isNewRecord: false })
       // Запихиваем его обратно в Парсер, в очередь активных
-      parser.activeRules.push(msg.testedRule)
+      await parser.addCheckedRule(msg.testedRule)
     } else {
       // Просто выводим лог
       console.log(
@@ -73,8 +77,8 @@ const masterMessageHandler = async (worker, msg) => {
         } обработано c ошибкой`
       )
     }
-    // Записали сами себя в готовые, надеюсь не рано (!)
-    parser.freeWorkers.push(worker.id)
+    // Вернули воркер в массив "свободных"
+    parser.pushToFreeWorkers(worker.id)
   }
 }
 

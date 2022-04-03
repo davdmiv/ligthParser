@@ -29,7 +29,7 @@ module.exports = (sequelize, DataTypes) => {
     }
 
     // Проверка
-    needCheck() {
+    get needCheck() {
       if (!(this.last_check && this.frequency)) {
         console.log(`last_check или frequency не корректные для ${this.name}`)
         return false
@@ -44,12 +44,12 @@ module.exports = (sequelize, DataTypes) => {
     }
 
     // Получить следующее время проверки
-    getNextCheckTime() {
+    get getNextCheckTime() {
       return this.last_check.getTime() + this.frequency.getTime()
     }
 
     // Получить таймаут до следующей проверки
-    getTimeout() {
+    get getTimeout() {
       return this.last_check.getTime() + this.frequency.getTime() - Date.now()
     }
   }

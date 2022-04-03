@@ -35,7 +35,7 @@ const workerMessageHandler = async (msg) => {
   // Просто всё разом запихнул в try catch
   try {
     // Обработка динамических правил
-    if (msg.target === 'checkDynamicRule' || msg.target === 'checkStaticRule') {
+    if (msg.target === 'checkRule') {
       // Достаём правило из сообщения
       let { rule } = msg
 
