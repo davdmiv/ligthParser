@@ -1,52 +1,76 @@
 const cluster = require('cluster')
 const { whoIs } = require('./asyncClusterUtils')
 
-// Функция установки таймаута на следующий запуск
-async function timeoutLoop() {
-  // Если по какой-то причине таймаут сработал, а правил нет
-  if (!this.hasActiveRules() || !this.isWork) {
-    console.log(
-      `${whoIs()} timeoutLoop(): this.hasActiveRules(): ${this.hasActiveRules()}, this.idWork: ${
-        this.isWork
-      } -- this.curTimeout cброшен`
-    )
-    this.curTimeout = null
+/**
+ * Что должен делать next loop?
+ * Должен:
+ * 1) Закидывать самое актуальное правило на обработку
+ * 2) Определять таймаут для следующего самого актуального правила
+ * Из 2 следует, что когда мы попали в next loop, мы объязаны запустить nextRule правило
+ *
+ * nextLoop не следит за правильностью текущей очереди, но планирует на будущее.
+ * -- Он запускат nextRule, который не хранится в activeRules
+ * (можно проверить его на needCheck прежде... хотя хз, что с ним делать если не готово)
+ * А затем извлекает из activeRules следующего кандидата
+ * - запихивает его в nextRule
+ * - ставит next loop на таймаут nextRule.getTimeout
+ * @returns
+ */
+async function nextLoop() {
+  // Если не работаем, то сброс таймаута и выход
+  if (!this.isWork) {
+    this.clearTickData()
     return
   }
-
-  // Сортируем очередь и узнаём, готово ли первое правило
-  if (this.isActiveRulesNextRedy()) {
-    // Берём первое на ожидании правило
-    let rule = this.activeRuleShift()
-    // Обработка, отправка
-    try {
-      console.log(`${whoIs()} timeoutLoop(): поиск воркеров...`)
-      let workerId = await this.getWorker()
-      console.log(`${whoIs()} timeoutLoop(): воркер найден`, workerId)
-
-      // Добавлям правило в массив "правил в обработке"
-      this.addToInProcessingRules(rule.id)
-      // Закинули правило на обработку Worker'у и забыли
-      cluster.workers[workerId].send({
-        target: 'checkRule',
-        rule,
-      })
-    } catch (error) {
-      console.log(`Ошибка в timeoutLoop() :`, error)
-    }
-
-    // Переходим к следующему правилу
-    this.curTimeout = this.hasActiveRules()
-      ? setTimeout(timeoutLoop.bind(this), this.activeRulesNextTimeout())
-      : null
+  // Иначе
+  if (this.nextRule) {
+    console.log('nextLoop(): this.nextRule', this.nextRule) // (!) Отладка <= тут оно всегда проинициализированно
+    // Добавлям правило в массив "правил в обработке"
+    this.addToInProcessingRules(this.nextRule.id)
+    // Поиск воркеров
+    let workerId = await this.getWorker() // (!) Отладка <= А всё потому, что тут разрывается атамарность функции и затирается
+    // (!) Отладка | и пока он там ждёт воркера, что-то другое пролетает над стеком и затирает this.nextRule
+    // (!) Отладка | нужно как-то получать воркеров не теряя контекст, или не позволять чему бы то ни было трогать правило,
+    // (!) Отладка | пока воркер не найден
+    console.log('MASTER перед отправкой msg', {
+      target: 'checkRule',
+      rule: this.nextRule, // (!) Отладка <= А тут оно, может быть пустым! всегда проинициализированно
+    }) // Отладка (!)
+    // Закинули правило на обработку
+    cluster.workers[workerId].send({
+      target: 'checkRule',
+      rule: this.nextRule,
+    })
+    // this.printState('nextLoop(): Перед вызовом setNextRule.call(this): ')
+    // Просто сократил кусок кода
+    setNextRule.call(this)
   }
-  // Если не готово, то перестраиваем таймер
+  // Если правило не определено, то нам не с чем работать
   else {
-    this.curTimeout = setTimeout(
-      timeoutLoop.bind(this),
-      this.activeRulesNextTimeout()
-    )
+    this.clearTickData()
   }
 }
 
-module.exports = { timeoutLoop }
+/**
+ * Устанавливает следующее правило
+ * и таймаут на его обработку
+ */
+function setNextRule() {
+  // Берём следующее минимальное по
+  this.nextRule = this.getNextActiveRule()
+
+  // Если Ок, -- вернулось правило
+  if (this.nextRule) {
+    console.log('setNextRule(): if (this.nextRule) { :', this.nextRule)
+    // Выставляем следующее время срабатывания
+    this.nextTick = this.nextRule.getNextCheckTime
+    // Выставляем слудующий таймаут
+    this.curTimeout = setTimeout(nextLoop.bind(this), this.nextTick.getTimeout)
+  }
+  // Если правило не определено, то нам не с чем работать
+  else {
+    this.clearTickData()
+  }
+}
+
+module.exports = { nextLoop, setNextRule }

@@ -1,6 +1,6 @@
 const { Rule } = require('../../../models/index')
-const { whoIs } = require('../async_handlers/asyncClusterUtils')
-const { timeoutLoop } = require('../async_handlers/parserControllerHelpers')
+// const { whoIs } = require('../async_handlers/asyncClusterUtils')
+const { setNextRule } = require('../async_handlers/parserControllerHelpers')
 
 /**
  * Singleton
@@ -22,6 +22,8 @@ class ParserController {
   inProcessingRules = []
   // время срабатываения следующего таймаута
   nextTick = null
+  // следующее правило
+  nextRule = null
 
   constructor() {
     // Singleton
@@ -32,6 +34,15 @@ class ParserController {
     // this.instance = this
     ParserController.instance = this
     return ParserController.instance
+  }
+
+  printState(str) {
+    console.log(
+      `${str}\nactiveRules:`,
+      this.activeRules.length,
+      '\nnextRule:',
+      this.nextRule
+    )
   }
 
   // ++ Worker'ы -----------------------------------------------------------------------
@@ -94,7 +105,8 @@ class ParserController {
     this.stop()
     console.log('Запуск парсера...')
     if (await this.initialQueue()) {
-      await this.loop()
+      this.isWork = true
+      this.loop()
       console.log('Парсер запущен!')
     } else {
       console.log('Запуск парсера прерван.')
@@ -105,28 +117,51 @@ class ParserController {
    * private
    * Метод запуск цикла обработки правил
    * Вешаем таймаут на первое созревшее,
-   * по готовности текущего timeoutLoop перевешивает на следующее.
+   * по его прошествии перевешиваем на следующее.
    */
-  async loop() {
+  loop() {
     // Выставляем флаг работы (возможно и не надо, лучше глобально)
-    this.isWork = true
-    // Бесконечный цикл работы (пока включён)
-    await timeoutLoop.call(this)
-    console.log('loop...')
+    if (this.isWork) {
+      this.clearTickData()
+      // Устанавливает следующее правило, и таймаут на его обработку
+      setNextRule.call(this)
+      console.log('loop...')
+    } else {
+      console.log('loop(): парсер отключен.')
+    }
   }
 
-  // async reLoop(){
-  //   if (nextTick)
-  // }
   /**
-   * Остановка парсера (через остановку очереди)
+   * Обнуляет таймаут и данные о следующем вызове, в т.ч и правило
+   */
+  clearTickData() {
+    clearTimeout(this.curTimeout)
+    this.curTimeout = null
+    this.nextRule = null
+    this.nextTick = null
+  }
+
+  /**
+   * Остановка парсера. (Скорее мягкая пауза)
+   * Выставляем флаг работы в false.
+   * Возвращаем next rule в активные.
+   * Обнуляем таймаут и данные о следующем правиле
    * @returns
    */
   stop() {
     this.isWork = false
-    clearTimeout(this.curTimeout)
+    // Если есть текущее правило, закидываем в активные
+    if (this.nextRule) {
+      this.activeRulesEasyPush(this.nextRule)
+    }
+    // Обнуляем данные о следующем вызове
+    this.clearTickData()
   }
 
+  /**
+   * Сохраняет время следующей проверки текущего правила
+   * @param {*} nextTick
+   */
   setNextTick(nextTick) {
     this.nextTick = nextTick
   }
@@ -155,17 +190,26 @@ class ParserController {
     return lengthBefore - this.inProcessingRules.length === 1 ? true : false
   }
 
-  // /**
-  //  * Проверяет есть ли правило в массиве "правил в обработке"
-  //  * @param {*} ruleId
-  //  * @returns
-  //  */
-  // isRuleInProcessingRules(ruleId) {
-  //   return this.inProcessingRules.find((id) => id === ruleId)
-  // }
+  /**
+   * Проверяет есть ли правило в массиве "правил в обработке"
+   * @param {*} ruleId
+   * @returns
+   */
+  isRuleInProcessing(ruleId) {
+    return this.inProcessingRules.find((id) => id === ruleId) ? true : false
+  }
   // -- Parser.inProcessingRules -----------------------------------------------------
 
   // ++ Parser.activeRules -----------------------------------------------------------
+  /**
+   * Проверяет есть ли правило в массиве "активных правил"
+   * @param {*} ruleId
+   * @returns
+   */
+  isRuleInActiveRules(ruleId) {
+    return this.activeRules.find((rule) => rule.id === ruleId) ? true : false
+  }
+
   /**
    * Удаляет из массива "активных правил"
    * @param {*} ruleId
@@ -179,44 +223,64 @@ class ParserController {
     return lengthBefore - this.activeRules.length === 1 ? true : false
   }
 
+  // --- тонкая настройка очереди правил
   /**
-   * Соритирует правила в очереди по оставшимуся ожиданию.
-   * В начале будут самые ранние.
+   * Находит правило с минимальным временем следующей проверки.
+   * Кандидат на следующую обработку
+   * @returns правило
    */
-  sortActiveRules() {
-    this.activeRules.sort((a, b) => a.getTimeout - b.getTimeout)
+  findNextActiveRule() {
+    return this.activeRules.reduce(
+      (pre, cur) => (cur.getNextCheckTime < pre.getNextCheckTime ? cur : pre),
+      this.activeRules[0]
+    )
   }
 
   /**
-   * Возвращает timeout первого правила в массиве "активных правил"
-   * @returns number
+   * Извлекает из очереди с минимальным timeout
+   * Кандидат на следующую обработку
+   * @returns
    */
-  activeRulesNextTimeout() {
-    return this.activeRules[0].getTimeout
+  getNextActiveRule() {
+    const findedRule = this.findNextActiveRule()
+    if (findedRule) {
+      this.activeRules = this.activeRules.filter(
+        (rule) => rule.id !== findedRule.id
+      )
+    }
+    return findedRule
   }
 
-  isActiveRulesNextRedy() {
-    this.sortActiveRules()
-    return this.activeRules[0].needCheck
+  /**
+   * Нужно ли сменить таймаут?
+   * Если время текущего на очереди правила больше проверяемого
+   * то возвращает true
+   * @param {*} rule
+   * @returns
+   */
+  isNeedReLoop(rule) {
+    if (this.isWork) {
+      return this.nextTick > rule.getNextCheckTime
+    }
+    // Если парсер выключен, то не перезапускать
+    // Это обеспечит возврат текущих обрабатываемых в активные.
+    return false
   }
+  // --- тонкая настройка очереди правил
 
   /**
    * Есть ли правила в "активных правилах"
    * @returns
    */
-  hasActiveRules() {
+  get hasActiveRules() {
     return this.activeRules.length ? true : false
   }
+
   /**
-   * private (?)
-   * Достаёт первое правило из массива "активных правил"
-   * Используется в timeoutLoop()
+   * Просто добавляет правило в массив активных правил
+   * @param {*} rule
    * @returns
    */
-  activeRuleShift() {
-    return this.activeRules.shift()
-  }
-
   activeRulesEasyPush(rule) {
     return this.activeRules.push(rule)
   }
@@ -226,36 +290,75 @@ class ParserController {
    * Возвращает обратно правило в очередь обработки
    * @param {*} rule
    */
-  async addCheckedRule(rule) {
-    // Если удалось удалить из массива "правил в обработке"
+  addCheckedRule(rule) {
+    // Удаляем из массива "правил в обработке"
+    // Если правила там нет, его скорее всего исключили из очереди
+    // Отсюда и добавляем только те, что были в обработке
     if (this.delFromInProcessingRules(rule.id)) {
-      // Добавляем в очередь активных
-      await this.addRuleToQueue(rule)
-    }
-  }
-
-  /**
-   * private
-   * Добавление любых правил происходит
-   * только если парсер запущен isWork == true
-   * @param {*} rule
-   */
-  async addRuleToQueue(rule) {
-    if (this.isWork) {
-      this.stop()
-      this.activeRules.push(rule)
-      await this.loop()
-    }
+      // Нужно ли перезаписать таймаут? (таймаут правила меньше текущего?)
+      if (!this.isNeedReLoop(rule)) {
+        // Если не нужено, то просто закидываем правило в активные
+        this.activeRulesEasyPush(rule)
+      } else {
+        // Если нужно, то закидываем текущее правило в активные
+        this.activeRulesEasyPush(this.nextRule)
+        // Закидываем туде же и пришедшее правило
+        this.activeRulesEasyPush(rule)
+        // Перезапускаем цикл (перезаписываем таймаут)
+        this.loop()
+      }
+    } 
   }
 
   /**
    * Добавляет правило в очередь обработки
-   * парсер должен быть запущен isWork == true
    * @param {*} rule
    */
-  async addActiveRule(rule) {
-    await this.addRuleToQueue(rule)
-    console.log(`${whoIs()} parser.addActiveRule()`)
+  addActiveRule(rule) {
+    // Правило новое? (нет ли где в обработке?)
+    if (this.isNewActiveRule(rule)) {
+      // Нужно ли перезаписать таймаут? (таймаут правила меньше текущего?)
+      if (!this.isNeedReLoop(rule)) {
+        // Если не нужено, то просто закидываем правило в активные
+        this.activeRulesEasyPush(rule)
+      } else {
+        // Если нужно, то закидываем текущее правило в активные
+        this.activeRulesEasyPush(this.nextRule)
+        // Закидываем туде же и пришедшее правило
+        this.activeRulesEasyPush(rule)
+        // Перезапускаем цикл (перезаписываем таймаут)
+        this.loop()
+      }
+      return true
+    }
+    // вот если не новое то, наверно надо заменить
+    else if (this.excludeRule(rule.id)) {
+      // Если удалось удалить, то повторяем наши действия
+      this.addActiveRule(rule) // Да, лень, съэкономил на строчках
+      return true
+    }
+    // так и не удалось удалить
+    return false
+  }
+
+  /**
+   * Проверяет есть ли id правила
+   * в массивах активных или в обработке,
+   * а также смотрит на текущее
+   * @param {*} rule
+   * @returns true если нигде не нашёл
+   */
+  isNewActiveRule(rule) {
+    // Если не "в активных правилах", не "в обработке" и "не текущее правило", то true
+    return !(
+      this.isRuleInActiveRules(rule.id) ||
+      this.isRuleInProcessing(rule.id) ||
+      this.isRuleIsNextRule(rule.id)
+    )
+  }
+
+  isRuleIsNextRule(ruleId) {
+    return this.nextRule && this.nextRule.id === ruleId
   }
 
   /**
@@ -263,29 +366,22 @@ class ParserController {
    * @param {*} rule
    * @returns
    */
-  async excludeRule(ruleId) {
-    // Останавливаем очередь
-    this.stop()
-
-    // Если правило было найдено и удалено хотя бы в одном из массивов
-    if (
-      this.delFromActiveRules(ruleId) ||
-      this.delFromInProcessingRules(ruleId)
-    ) {
-      // Включаем обратно очередь
-      await this.loop()
-      // Сообщаем об успешном завершении исключения правила
+  excludeRule(ruleId) {
+    // Если правило -- текущее правило
+    if (this.isRuleIsNextRule(ruleId)) {
+      // Нужно перестроение очереди
+      // т.к. текущее не в очереди, то его перезатрёт
+      this.loop()
       return true
     }
-    // Иначе, ну что-то пошло не так...
+    // Если не текущее, но в активных
+    else if (this.isRuleInActiveRules(ruleId)) {
+      // Удаляем, он не на что не повлияет
+      return this.delFromActiveRules(ruleId)
+    }
+    // Если и не в обработке, то не удалось
     else {
-      console.log(
-        `${whoIs()} excludeRule() не удалось исключить правило ${ruleId}`
-      ) // Логируем...
-      // Включаем обратно очередь
-      await this.loop()
-      // Сообщаем о том, что не удалось исключить правило
-      return false
+      return this.delFromInProcessingRules(ruleId)
     }
   }
 }

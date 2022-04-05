@@ -17,7 +17,7 @@ const { Rule } = require('../../../models/index')
  * @param {*} msg
  */
 const workerMessageHandler = async (msg) => {
-  console.log(`${whoIs()}, WMH: получил сообщение '${msg.target}'`)
+  console.log(`${whoIs()}, WMH: получил сообщение '${msg.target}'`, msg)
 
   // Подготавливаем объект ответа
   let response = {
@@ -29,9 +29,22 @@ const workerMessageHandler = async (msg) => {
   // Если в объекте сообщения есть правило
   if (msg.rule) {
     // Сразу ребилдим правило
-    msg.rule = Rule.build(msg.rule, { isNewRecord: false })
+    let rule = Rule.build(msg.rule, { isNewRecord: false })
+    if (rule) {
+      // console.log('!!!============!!! msg сбилдилось! rule после билада:', rule)
+      msg.rule = rule
+      // console.log('!!! msg.rule = rule / msg.rule:', msg.rule)
+    } else {
+      console.log(
+        '!!!============!!! msg НЕ СБИЛДИЛОСЬ! rule после билада:',
+        rule,
+        ' и то как было до: response:',
+        msg
+      )
+    }
+  } else {
+    console.log('================== пришло пусто msg')
   }
-
   // Просто всё разом запихнул в try catch
   try {
     // Обработка динамических правил
@@ -50,14 +63,18 @@ const workerMessageHandler = async (msg) => {
         // Обновляем инфу о правиле
         await rule.update({
           activate_status: false,
-          description: `Обнаружена ошибка с правилом, правило деактивировано. \n Ошибка: \n ${testedRule.message}\n${rule.description}`,
+          description: `Обнаружена ошибка с правилом, правило деактивировано. \n Ошибка: \n ${
+            testedRule.message
+          }\n${rule ? rule.description : ''}`,
         })
 
         // Выводим лог в консоль (!) Отладка
-        console.log(
-          `${whoIs()}, получил ошибку из ${msg.target}(), правило ${rule.name}`,
-          testedRule
-        )
+        // console.log(
+        //   `${whoIs()}, получил ошибку из ${msg.target}(), правило ${
+        //     rule ? rule.name : response.origRule.name
+        //   }`,
+        //   testedRule
+        // )
       }
 
       // Формируем ответ

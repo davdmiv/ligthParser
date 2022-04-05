@@ -15,7 +15,10 @@ const checkRule = async (rule) => {
     // И не сбилжено (м.б лучше класс смотреть)
     if (!rule.dataValues) {
       // Сразу ребилдим правило
+      let rule1 = rule
+      console.log('checkRule() РЕБИЛДИТ ПРАВИЛО!', rule1)
       rule = Rule.build(rule, { isNewRecord: false })
+      console.log('checkRule() РЕБИЛДИТ ПРАВИЛО!', rule)
     }
   } else {
     return ApiError.badRequest('Правило не найдено')

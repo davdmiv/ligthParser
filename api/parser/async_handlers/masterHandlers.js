@@ -44,7 +44,7 @@ const masterMessageHandler = async (worker, msg) => {
       // Ребилдим правило
       msg.rule = Rule.build(msg.rule, { isNewRecord: false })
       // Добавляем в очередь
-      await parser.addActiveRule(msg.rule)
+      parser.addActiveRule(msg.rule)
     } else {
       console.log(`${whoIs()}: activateRule: правило не опеределено`)
     }
@@ -54,7 +54,7 @@ const masterMessageHandler = async (worker, msg) => {
   // Исключаем правило из очереди активных (если оно там есть)
   if (msg.target === 'deactivateRule') {
     if (msg.ruleId) {
-      await parser.excludeRule(msg.ruleId)
+      parser.excludeRule(msg.ruleId)
     } else {
       console.log(`${whoIs()}: activateRule: правило не опеределено`)
     }
@@ -66,9 +66,14 @@ const masterMessageHandler = async (worker, msg) => {
     // Если не была передана ошибка
     if (!msg.error) {
       // Ребилдим правило
-      msg.testedRule = Rule.build(msg.testedRule, { isNewRecord: false })
+      let reBuildRule = Rule.build(msg.testedRule, { isNewRecord: false })
+      if (reBuildRule) {
+        msg.testedRule = reBuildRule
+      } else {
+        console.log('MHH ПОТЕРЯ, не сбилдилось в ответе checkRule')
+      }
       // Запихиваем его обратно в Парсер, в очередь активных
-      await parser.addCheckedRule(msg.testedRule)
+      parser.addCheckedRule(msg.testedRule)
     } else {
       // Просто выводим лог
       console.log(
