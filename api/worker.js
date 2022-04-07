@@ -17,11 +17,15 @@ const {
 // чтобы не было постоянных подключений
 // const { sequelize } = require('./models/index')
 
+// Очереди
+const amqp = require('amqplib/callback_api')
+
 // Импортируем конфигурацию веб-сервера
 const app = require('./server/app')
 
 // Создаём сервер на основе импортированной конфигурации
 const server = http.createServer(app)
+
 // Запускаем прослушку порта
 server.listen(PORT, () =>
   console.log(`${whoIs()} Server started.  server.address():`, server.address())
@@ -32,6 +36,28 @@ server.on('error', onError)
 // server.on('listening', () => {
 //   console.log(`${whoIs()} server.address()`, server.address())
 // })
+
+// Устанавливаем коннект с сервером очередей
+amqp.connect('amqp://localhost', function(error0, connection) {
+  // Если ошибка, то бросаем исключение
+  if (error0) {
+    throw error0
+  }
+  // Если нет ошибок, то создаём канал
+  connection.createChannel(function(error1, channel) {
+    // Если при создании канала была ошибка, то бросаем исключение
+    if (error1) {
+      throw error1;
+    }
+    // Очередь (название)
+    let queue = 'hello';
+
+    // Получаем сообщение из очереди-? Ждём сообщения?
+    channel.assertQueue(queue, {
+      durable: false
+    });
+  });
+});
 
 //При запуске посылают на мастер 'workerIsReady' что готовы
 const status = cluster.worker.send({ target: 'workerIsReady' })
@@ -67,3 +93,4 @@ function onError(error) {
       throw error
   }
 }
+
